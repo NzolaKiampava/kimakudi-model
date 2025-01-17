@@ -3509,7 +3509,11 @@
                                             <p class="mb-0 fs-10 text-body-tertiary">${post.annual_income}</p>
                                           </div>
                                         </td>
-                                        <td class="status align-middle text-end"><span class="badge badge-phoenix fs-10 badge-phoenix-primary">${post.previsao}</span></td>
+                                        <td class="status align-middle text-end">
+                                          <span class="badge badge-phoenix fs-10 ${post.previsao ? 'badge-phoenix-success' : 'badge-phoenix-warning'}">
+                                            ${post.previsao}
+                                          </span>
+                                        </td>
                                         <td class="align-middle text-end time">
                                           <div class="d-flex justify-content-end align-items-center gap-2 mb-2"><span class="fa-regular fa-clock text-body"> </span><span class="text-body fw-semibold">08:26 PM</span></div>
                                           <div class="d-flex justify-content-end gap-2"><span class="text-body" data-feather="calendar" style="width:16px; height:16px"></span><span class="text-body fw-semibold">Sexta-Feira, Junho 22, 2024</span></div>
@@ -3794,9 +3798,7 @@
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
     <script src="../vendors/swiper/swiper-bundle.min.js"></script>
   </body>
-
 </html>
-
 
 <script>
   //C:\Users\User02\Desktop\kumikudi\model1\dashboard\dashboard

@@ -1,112 +1,199 @@
 import streamlit as st
 import pandas as pd
 import json
-from utils import Transformer
 
 def validar_dados(dict_respostas):
     if dict_respostas['years_working'] != 0 and dict_respostas['years_unemployed'] != 0:
         st.warning('Dados de emprego/desemprego incompatíveis.')
         return False
+        
+    if dict_respostas['children_count'] > dict_respostas['family_size']:
+        st.warning('Número de filhos não pode ser maior que o tamanho da família.')
+        return False
+        
+    if dict_respostas['age'] < 18:
+        st.warning('Idade mínima para análise de crédito é 18 anos.')
+        return False
+        
     return True
 
 def analisar_credito(dict_respostas):
-    """Simulação de análise de crédito Utilizando Machine Learning."""
-    if dict_respostas['annual_income'] > 20000 and dict_respostas['age'] > 25:
-        return True  # Crédito viável
+    """Análise de crédito utilizando múltiplos fatores."""
+    # Cálculo do score base
+    score = 0
+    
+    # Fator idade
+    if dict_respostas['age'] >= 25:
+        score += 100
     else:
-        return False  # Crédito não recomendado
+        score += (dict_respostas['age'] - 18) * 15
+    
+    # Fator renda
+    if dict_respostas['annual_income'] > 20000:
+        score += 150
+    else:
+        score += (dict_respostas['annual_income'] / 20000) * 150
+    
+    # Fator educação
+    education_scores = {
+        'Doutorado': 100,
+        'Mestrado': 90,
+        'Pós-Graduação': 80,
+        'Superior Completo': 70,
+        'Superior Incompleto': 50,
+        'Ensino Médio': 30,
+        'Ensino Fundamental': 20
+    }
+    score += education_scores.get(dict_respostas['education_type'], 0)
+    
+    # Fator tempo de trabalho
+    if dict_respostas['years_working'] > 0:
+        score += min(dict_respostas['years_working'] * 10, 100)
+    
+    # Fatores de estabilidade
+    if dict_respostas['own_property']:
+        score += 50
+    if dict_respostas['own_car']:
+        score += 30
+    if dict_respostas['own_workphone']:
+        score += 20
+    
+    # Resultado
+    return {
+        'previsao': score >= 300,  # Alterado de 'approved' para 'previsao'
+        'score': score,  # Alterado de 'credit_score' para 'score'
+        'max_comprometimento': (dict_respostas['annual_income'] / 12) * 0.3  # Alterado nome em português
+    }
 
-def exibir_resultados(previsao):
-    """Exibe os resultados da análise de crédito."""
-    if previsao:
+def exibir_resultados(resultado):
+    if resultado['previsao']:  # Alterado de 'approved' para 'previsao'
         st.image("img/approved.gif")
         st.success("Seu crédito é viável!")
+        st.metric("Score de Crédito", f"{resultado['score']:.0f}/600")  # Alterado 'credit_score' para 'score'
+        st.metric("Comprometimento Máximo Mensal", f"KZ {resultado['max_comprometimento']:.2f}")
     else:
         st.image("img/denied.gif")
         st.error("Seu crédito não é recomendado.")
-
-def estilo_local(nome_do_arquivo):
-    """Carrega o estilo do CSS para a aplicação."""
-    with open(nome_do_arquivo) as f:
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+        st.metric("Score de Crédito", f"{resultado['score']:.0f}/600")
 
 def main():
-    """Função principal da aplicação Streamlit."""
-    estilo_local("style.css")
+    st.set_page_config(page_title="Kima Kudi - Análise de Crédito", layout="wide")
+    
+    with open("style.css") as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
     st.image("img/kima_kudi_logo_white.png")
     st.markdown("<h1 style='text-align: center; color: black;'>🧠 Kima Kudi - Análise Inteligente de Crédito 🧠</h1>", unsafe_allow_html=True)
 
-    st.markdown("Bem-vindo ao **Kima Kudi**, seu assistente inteligente para a concepção de crédito bancário. Preencha as informações abaixo e clique em **Analisar Crédito** para verificar se seu crédito é <span style='color: green'>viável</span> ou <span style='color: red'>não recomendado</span>.", unsafe_allow_html=True)
+    tabs = st.tabs(["📝 Formulário", "📊 Estatísticas", "ℹ️ Sobre"])
 
-    st.caption("**Aviso:** Kima Kudi é um sistema fictício para fins educacionais. A análise é feita com utilizando Machine Learning. Mais detalhes podem ser encontrados [aqui no repositório do projeto](https://github.com/diascarolina/credit-scoring-streamlit).")
+    with tabs[0]:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            personal_info = st.expander("👤 Informações Pessoais", expanded=True)
+        with col2:
+            financial_info = st.expander("💰 Informações Financeiras", expanded=True)
 
-    expander_1 = st.expander("👤 Informações Pessoais")
-    expander_2 = st.expander("💼 Informações Profissionais")
-    expander_3 = st.expander("👥 Informações Familiares")
+        dict_respostas = {}
 
-    dict_respostas = {}
+        with personal_info:
+            dict_respostas['name'] = st.text_input('Nome Completo')
+            dict_respostas['age'] = st.slider('Idade', 18, 100, 30)
+            dict_respostas['education_type'] = st.selectbox(
+                'Nível de Escolaridade',
+                ['Ensino Fundamental', 'Ensino Médio', 'Superior Incompleto', 
+                 'Superior Completo', 'Pós-Graduação', 'Mestrado', 'Doutorado']
+            )
+            dict_respostas['marital_status'] = st.selectbox(
+                'Estado Civil',
+                ['Solteiro', 'Casado', 'Divorciado', 'Viúvo', 'União Estável']
+            )
+            dict_respostas['family_size'] = st.number_input('Tamanho da Família', 1, 20, 1)
+            dict_respostas['children_count'] = st.number_input('Quantidade de Filhos', 0, 20, 0)
 
-    # Dicionário para armazenar as categorias para cada selectbox
-    categorias = {
-        'education_type': ['Ensino Fundamental', 'Ensino Médio', 'Superior Incompleto', 'Superior Completo', 'Pós-Graduação', 'Mestrado', 'Doutorado', 'Não Informado', 'Outro'],
-        'marital_status': ['Casado', 'Solteiro', 'Separado', 'Divorciado', 'Viúvo', 'União Estável'],
-        'occupation_type': ['Desempregado', 'Aposentado', 'Trabalhador Autônomo', 'Empregado', 'Servidor Público', 'Outros'],
-        'income_type': ['Desempregado', 'Aposentado', 'Trabalhador Autônomo', 'Empregado', 'Servidor Público', 'Outros'],
-        'housing_type': ['Desempregado', 'Aposentado', 'Trabalhador Autônomo', 'Empregado', 'Servidor Público', 'Outros']
-    }
+        with financial_info:
+            dict_respostas['annual_income'] = st.number_input('Renda Anual', 0, 1000000, 0)
+            dict_respostas['years_working'] = st.number_input('Anos de Trabalho', 0, 50, 0)
+            dict_respostas['years_unemployed'] = st.number_input('Anos Desempregado', 0, 50, 0)
+            dict_respostas['own_property'] = st.checkbox('Possui Imóvel Próprio')
+            dict_respostas['own_car'] = st.checkbox('Possui Carro')
+            dict_respostas['own_workphone'] = st.checkbox('Possui Telefone Comercial')
 
-    with expander_1:
-        col1_form, col2_form = st.columns(2)
+        if st.button('Analisar Crédito', type='primary'):
+            if validar_dados(dict_respostas):
+                with st.spinner('Analisando seu perfil...'):
+                    resultado = analisar_credito(dict_respostas)
+                    exibir_resultados(resultado)
+                    
+                    # Salvando dados com o resultado
+                    dados_salvos = dict_respostas.copy()
+                    dados_salvos.update(resultado)  # Combina os dicionários
+                    
+                    try:
+                        with open("credit_requests.json", "r+", encoding="utf-8") as file:
+                            try:
+                                data = json.load(file)
+                            except json.JSONDecodeError:
+                                data = []
+                            data.append(dados_salvos)
+                            file.seek(0)
+                            file.truncate()
+                            json.dump(data, file, indent=4)
+                    except FileNotFoundError:
+                        with open("credit_requests.json", "w", encoding="utf-8") as file:
+                            json.dump([dados_salvos], file, indent=4)
 
-        dict_respostas['name'] = col1_form.text_input('Nome Completo')
-        dict_respostas['age'] = col1_form.slider('Qual sua idade?', help='O controle deslizante pode ser movido usando as teclas de seta.', min_value=0, max_value=100, step=1)
-        dict_respostas['education_type'] = col1_form.selectbox('Qual seu nível de escolaridade?', categorias['education_type'])
-        dict_respostas['marital_status'] = col1_form.selectbox('Qual seu estado civil?', categorias['marital_status'])
-        dict_respostas['own_car'] = 1 if col2_form.selectbox('Você possui um carro?', ['Sim', 'Não']) == 'Sim' else 0
-        dict_respostas['own_phone'] = 1 if col2_form.selectbox('Você possui um telefone? (não celular)', ['Sim', 'Não']) == 'Sim' else 0
-        dict_respostas['own_email'] = 1 if col2_form.selectbox('Você possui um endereço de e-mail?', ['Sim', 'Não']) == 'Sim' else 0
+    with tabs[1]:
+        st.header("Estatísticas de Análises")
+        try:
+            with open("credit_requests.json", "r") as file:
+                data = json.load(file)
+                if data:  # Verifica se há dados
+                    df = pd.DataFrame(data)
+                    
+                    st.metric("Total de Análises", len(df))
+                    
+                    # Agora usando 'previsao' em vez de 'approved'
+                    aprovados = df[df['previsao'] == True]
+                    taxa_aprovacao = len(aprovados) / len(df) * 100
+                    st.metric("Taxa de Aprovação", f"{taxa_aprovacao:.1f}%")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.subheader("Distribuição por Escolaridade")
+                        education_counts = df['education_type'].value_counts()
+                        st.bar_chart(education_counts)
+                    
+                    with col2:
+                        st.subheader("Distribuição por Estado Civil")
+                        marital_counts = df['marital_status'].value_counts()
+                        st.bar_chart(marital_counts)
+                    
+                    st.subheader("Distribuição de Scores")
+                    st.bar_chart(df['score'])  # Alterado de 'credit_score' para 'score'
+                else:
+                    st.info("Ainda não há dados de análises realizadas.")
+                    
+        except FileNotFoundError:
+            st.info("Ainda não há dados de análises realizadas.")
+        except Exception as e:
+            st.error(f"Erro ao carregar estatísticas: {str(e)}")
 
-    with expander_2:
-        col3_form, col4_form = st.columns(2)
-
-        dict_respostas['occupation_type'] = col3_form.selectbox('Qual o tipo de seu trabalho?', categorias['occupation_type'])
-        dict_respostas['income_type'] = col3_form.selectbox('Qual o tipo de sua renda?', categorias['income_type'])
-        dict_respostas['own_workphone'] = 1 if col3_form.selectbox('Você possui um telefone comercial?', ['Sim', 'Não']) == 'Sim' else 0
-        dict_respostas['annual_income'] = col3_form.slider('Qual seu salário mensal?', help='O controle deslizante pode ser movido usando as teclas de seta.', min_value=0, max_value=35000, step=500) * 12
-        dict_respostas['years_working'] = col4_form.slider('Há quantos anos você trabalha (em anos)?', help='O controle deslizante pode ser movido usando as teclas de seta.', min_value=0, max_value=50, step=1)
-        dict_respostas['years_unemployed'] = col4_form.slider('Há quantos anos você está desempregado (em anos)?', help='O controle deslizante pode ser movido usando as teclas de seta.', min_value=0, max_value=50, step=1)
-
-    with expander_3:
-        col4_form, col5_form = st.columns(2)
-
-        dict_respostas['housing_type'] = col4_form.selectbox('Qual o tipo de sua moradia?', categorias['housing_type'])
-        dict_respostas['own_property'] = 1 if col4_form.selectbox('Você possui um imóvel?', ['Sim', 'Não']) == 'Sim' else 0
-        dict_respostas['family_size'] = col5_form.slider('Qual o tamanho de sua família?', help='O controle deslizante pode ser movido usando as teclas de seta.', min_value=1, max_value=20, step=1)
-        dict_respostas['children_count'] = col5_form.slider('Quantos filhos você tem?', help='O controle deslizante pode ser movido usando as teclas de seta.', min_value=0, max_value=20, step=1)
-
-    if st.button('Analisar Crédito'):
-        if validar_dados(dict_respostas):
-            previsao = analisar_credito(dict_respostas)
-            exibir_resultados(previsao)
-
-            # Salvar dados no arquivo JSON
-            dict_respostas['previsao'] = 'Recomendado' if previsao else 'No recomendado'
-
-            try:
-                # Tenta carregar o arquivo JSON existente
-                with open("credit_requests.json", "r", encoding="utf-8") as file:
-                    data = json.load(file)
-            except FileNotFoundError:
-                # Se o arquivo não existir, cria uma lista vazia
-                data = []
-
-            # Adiciona os novos dados à lista
-            data.append(dict_respostas)
-
-            # Salva a lista atualizada no arquivo JSON
-            with open("credit_requests.json", "w", encoding="utf-8") as file:
-                json.dump(data, file, indent=4)
+    with tabs[2]:
+        st.header("Sobre o Sistema")
+        st.markdown("""
+        O Kima Kudi utiliza um sistema avançado de análise de crédito que considera diversos fatores:
+        
+        - Score de crédito personalizado
+        - Análise de capacidade de pagamento
+        - Fatores de estabilidade financeira
+        - Histórico profissional
+        - Perfil socioeconômico
+        
+        Nossa análise é baseada em um algoritmo que considera múltiplos fatores para garantir
+        uma avaliação justa e precisa do seu perfil de crédito.
+        """)
 
 if __name__ == "__main__":
     main()
